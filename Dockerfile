@@ -8,8 +8,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # 先复制 package.json 和 prisma 目录（关键！）
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* pnpm-workspace.yaml* .npmrc* ./
-COPY prisma ./prisma/
+COPY . .
 
 RUN \
   if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
