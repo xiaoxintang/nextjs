@@ -49,9 +49,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 # 在切换用户之前创建 entrypoint 脚本（修改这部分）
 RUN echo '#!/bin/sh' > /entrypoint.sh && \
     echo 'set -e' >> /entrypoint.sh && \
-    echo 'echo "Applying database migrations..."' >> /entrypoint.sh && \
-    echo 'DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy' >> /entrypoint.sh && \
-    echo 'echo "Database migrations applied successfully!"' >> /entrypoint.sh && \
     echo 'echo "Starting Next.js application..."' >> /entrypoint.sh && \
     echo 'exec node server.js' >> /entrypoint.sh && \
     chmod +x /entrypoint.sh && \
