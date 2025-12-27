@@ -46,11 +46,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# 【关键修复】在切换用户之前创建 entrypoint 脚本
+# 在切换用户之前创建 entrypoint 脚本
 RUN echo '#!/bin/sh' > /entrypoint.sh && \
     echo 'set -e' >> /entrypoint.sh && \
     echo 'echo "Applying database migrations..."' >> /entrypoint.sh && \
-    echo 'npx prisma migrate deploy' >> /entrypoint.sh && \
+    echo 'DATABASE_URL=${DATABASE_URL} npx prisma migrate deploy' >> /entrypoint.sh && \
     echo 'echo "Starting Next.js application..."' >> /entrypoint.sh && \
     echo 'exec node server.js' >> /entrypoint.sh && \
     chmod +x /entrypoint.sh && \
