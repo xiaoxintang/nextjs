@@ -1,59 +1,62 @@
 # syntax=docker.io/docker/dockerfile:1
 
 FROM node:20-alpine AS base
-
-# Install dependencies only when needed
-FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# 先复制 package.json 和 prisma 目录（关键！）
-COPY . .
+# 1. 安装依赖阶段（最大化缓存）
+FROM base AS deps
+# 只复制包管理 + prisma 文件
+COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./  # 如果有的话
 
-RUN \
-  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
+RUN corepack enable pnpm && \
+    corepack prepare pnpm@latest --activate && \
+    pnpm i --frozen-lockfile
 
-
-# Rebuild the source code only when needed
+# 2. 构建阶段
 FROM base AS builder
-WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+# 先复制必要配置
+COPY package.json pnpm-lock.yaml next.config.js tsconfig.json ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./  # 如果有
+# 再复制源码
 COPY . .
 
-# 禁用 telemetry（可选）
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN \
-  if [ -f yarn.lock ]; then yarn run build; \
-  elif [ -f package-lock.json ]; then npm run build; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm run build; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
+# 生成 Prisma Client + 构建
+RUN corepack enable pnpm && \
+    corepack prepare pnpm@latest --activate && \
+    npx prisma generate && \
+    pnpm run build
 
-
-# Production image
+# 3. 生产运行阶段
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# 创建用户
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# 复制 standalone 输出和 static 文件
+# 复制文件
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# 关键：复制 prisma 目录到 runtime，用于运行时执行 migrate deploy
-COPY --from=builder /app/prisma ./prisma
+USER nextjs
 
-# 创建启动脚本（推荐方式）
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# 入口脚本（带 migrate）
 RUN echo '#!/bin/sh' > /entrypoint.sh && \
     echo 'set -e' >> /entrypoint.sh && \
     echo 'echo "Applying database migrations..."' >> /entrypoint.sh && \
@@ -62,11 +65,4 @@ RUN echo '#!/bin/sh' > /entrypoint.sh && \
     echo 'exec node server.js' >> /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
-USER nextjs
-
-EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-# 使用 entrypoint 脚本启动
 CMD ["/entrypoint.sh"]
