@@ -9,7 +9,7 @@ FROM base AS deps
 # 只复制包管理 + prisma 文件
 COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
-COPY prisma.config.ts ./  # 如果有的话
+COPY prisma.config.ts ./
 
 RUN corepack enable pnpm && \
     corepack prepare pnpm@latest --activate && \
@@ -19,9 +19,9 @@ RUN corepack enable pnpm && \
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 # 先复制必要配置
-COPY package.json pnpm-lock.yaml next.config.js tsconfig.json ./
+COPY package.json pnpm-lock.yaml next.config.* tsconfig.json ./
 COPY prisma ./prisma
-COPY prisma.config.ts ./  # 如果有
+COPY prisma.config.ts ./
 # 再复制源码
 COPY . .
 
