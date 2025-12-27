@@ -9,7 +9,7 @@ WORKDIR /app
 
 # 先复制 package.json 和 prisma 目录（关键！）
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* pnpm-workspace.yaml* .npmrc* ./
-COPY prisma ./prisma/   # <--- 新增这一行，确保 prisma generate 能找到 schema.prisma
+COPY prisma ./prisma/
 
 RUN \
   if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
